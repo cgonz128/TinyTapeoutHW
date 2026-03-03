@@ -1,7 +1,7 @@
 # Tiny Tapeout project information
 project: Test ALU
   title:        "Simple ALU"      # Project title
-  author:       "Chris Gonzalez-Ordonez"      # Your name
+  author:       "Chris Gonzalez Ordonez"      # Your name
   discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
   description:  "simple alu that computes, flog2, OR, ADD, and SUB"      # One line description of what your project does
   language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
