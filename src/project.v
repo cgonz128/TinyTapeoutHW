@@ -17,7 +17,21 @@ module tt_um_example (
 );
 
   // All output pins must be assigned. If not used, assign to 0.
-  assign uo_out  = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
+  wire [7:0] flog2;
+  assign flog2 = (ui_in[7])? 8'd7: 
+                (ui_in[6])? 8'd6: 
+                (ui_in[5])? 8'd5:
+                (ui_in[4])? 8'd4:
+                (ui_in[3])? 8'd3:
+                (ui_in[2])? 8'd2:
+                (ui_in[1])? 8'd1:
+                            8'd0;
+
+  assign uo_out = (uio_in[3])?  flog2 :
+                  (uio_in[2])?  {2'b00, ui_in[7:2]} | {2'b00, ui_in[1:0], uio_in[7:4]} :
+                  (uio_in[1])?  {2'b00, ui_in[7:2]} + {2'b00, ui_in[1:0], uio_in[7:4]} :
+                  (uio_in[0])?  {2'b00, ui_in[7:2]} - {2'b00, ui_in[1:0], uio_in[7:4]}: 0;
+          
   assign uio_out = 0;
   assign uio_oe  = 0;
 

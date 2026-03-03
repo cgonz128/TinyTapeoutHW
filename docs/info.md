@@ -9,12 +9,18 @@ You can also include images in this folder and reference them in the markdown. E
 
 ## How it works
 
-Explain how your project works
+This is a simple ALU that implements Flog2, logical OR, AND, and SUBTRACT
+uio_in[3:0] controls what operation is performed 
+operation==4'b0001 SUB. ui_in[7:2]- + { ui_in[1:0], uio_in[7:4]}
+operation==4'b0010 ADD. ui_in[7:2] + {ui_in[1:0], uio_in[7:4]}
+operation==4'b0100 OR. ui_in[7:2] | { ui_in[1:0], uio_in[7:4]}
+operation==4'b1000 FLOG2 ui_in[7:0]
+else y = 0
+
 
 ## How to test
 
-Explain how to use your project
-
+You can use test/tb.v for a verilog test simulation. 
 ## External hardware
 
-List external hardware used in your project (e.g. PMOD, LED display, etc), if any
+No external hardware is needed

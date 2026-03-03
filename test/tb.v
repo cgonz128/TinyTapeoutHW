@@ -46,4 +46,78 @@ module tb ();
       .rst_n  (rst_n)     // not reset
   );
 
+  // -------------------------------------------------
+  // Assertion helper
+  // -------------------------------------------------
+  task automatic expect(input [7:0] exp, input string name);
+    begin
+      #1; // allow combinational settle
+      assert (uo_out === exp)
+        else begin
+          $error("ASSERT FAIL (%s): got %0d (0x%02x), expected %0d (0x%02x)",
+                 name, uo_out, uo_out, exp, exp);
+          $fatal;
+        end
+      $display("PASS (%s): %0d (0x%02x)", name, uo_out, uo_out);
+    end
+  endtask
+
+  // -------------------------------------------------
+  // Tests
+  // -------------------------------------------------
+  initial begin
+    // defaults
+    clk   = 1'b0;
+    rst_n = 1'b1;
+    ena   = 1'b1;
+    ui_in  = 8'h00;
+    uio_in = 8'h00;
+
+    $display("=== TinyTapeout ALU Assertion Test ===");
+
+    // -------------------------
+    // flog2 (uio_in[3])
+    // -------------------------
+    uio_in = 8'b0000_1000;
+    ui_in  = 8'b0010_0000; // MSB = 5
+    expect(8'd5, "flog2(0x20)");
+
+    ui_in  = 8'b0000_0001;
+    expect(8'd0, "flog2(0x01)");
+
+    ui_in  = 8'b1000_0000;
+    expect(8'd7, "flog2(0x80)");
+
+    // -------------------------
+    // OR (uio_in[2])
+    // -------------------------
+    uio_in = 8'b0000_0100;
+    ui_in  = 8'b1101_0100;
+    expect(8'b00001101, "OR");
+
+    // -------------------------
+    // ADD (uio_in[1])
+    // -------------------------
+    uio_in = 8'b0000_0010;
+    ui_in  = 8'b0011_0010;
+    expect(8'b0, "ADD");
+
+    // -------------------------
+    // SUB (uio_in[0])
+    // -------------------------
+    uio_in = 8'b0000_0100;
+    ui_in  = 8'b0101_0001;
+    expect(8'd4, "SUB");
+
+    // -------------------------
+    // Default case
+    // -------------------------
+    uio_in = 8'b0000_0000;
+    ui_in  = 8'hFF;
+    expect(8'd0, "DEFAULT");
+
+    $display("🎉 ALL ASSERTIONS PASSED");
+    $finish;
+  end
+
 endmodule
