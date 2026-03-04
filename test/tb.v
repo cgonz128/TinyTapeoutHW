@@ -46,77 +46,113 @@ module tb ();
       .rst_n  (rst_n)     // not reset
   );
 
-  // -------------------------------------------------
-  // Assertion helper
-  // -------------------------------------------------
-  task automatic expect(input [7:0] exp, input string name);
+  initial clk = 0;
+  always #5 clk = ~clk;
+
+  //test logic
+
+  integer pass_count;
+  integer fail_count;
+
+  task apply_and_check;
+    input [7:0] t_ui_in;
+    input [7:0] t_uio_in;
+    input [7:0] expected;
+    input integer test_id;
     begin
-      #1; // allow combinational settle
-      assert (uo_out === exp)
-        else begin
-          $error("ASSERT FAIL (%s): got %0d (0x%02x), expected %0d (0x%02x)",
-                 name, uo_out, uo_out, exp, exp);
-          $fatal;
-        end
-      $display("PASS (%s): %0d (0x%02x)", name, uo_out, uo_out);
+      ui_in  = t_ui_in;
+      uio_in = t_uio_in;
+      @(posedge clk);
+      #1;
+      if (uo_out === expected) begin
+        pass_count = pass_count + 1;
+      end else begin
+        $display("FAIL [test %0d]: ui_in=0x%02x uio_in=0x%02x  got=0x%02x  exp=0x%02x",
+                 test_id, t_ui_in, t_uio_in, uo_out, expected);
+        fail_count = fail_count + 1;
+      end
     end
   endtask
 
-  // -------------------------------------------------
-  // Tests
-  // -------------------------------------------------
+  integer i;
+  reg [7:0] a, b;
+
   initial begin
-    // defaults
-    clk   = 1'b0;
-    rst_n = 1'b1;
-    ena   = 1'b1;
+    pass_count = 0;
+    fail_count = 0;
+
+    // Reset
+    ena   = 1;
+    rst_n = 0;
     ui_in  = 8'h00;
     uio_in = 8'h00;
+    repeat(2) @(posedge clk);
+    rst_n = 1;
+    @(posedge clk);
 
-    $display("=== TinyTapeout ALU Assertion Test ===");
+    // --- No-op (uio_in[3:0] = 0) ---
+    $display("--- No-op ---");
+    apply_and_check(8'hFF, 8'h00, 8'h00, 0);
+    apply_and_check(8'h00, 8'h00, 8'h00, 1);
 
-    // -------------------------
-    // flog2 (uio_in[3])
-    // -------------------------
-    uio_in = 8'b0000_1000;
-    ui_in  = 8'b0010_0000; // MSB = 5
-    expect(8'd5, "flog2(0x20)");
+    // --- floor(log2(ui_in))  uio_in[3]=1 ---
+    $display("--- floor(log2) ---");
+    apply_and_check(8'b00000000, 8'b00001000, 8'd0, 10);
+    apply_and_check(8'b00000001, 8'b00001000, 8'd0, 11);
+    apply_and_check(8'b00000010, 8'b00001000, 8'd1, 12);
+    apply_and_check(8'b00000100, 8'b00001000, 8'd2, 13);
+    apply_and_check(8'b00001000, 8'b00001000, 8'd3, 14);
+    apply_and_check(8'b00010000, 8'b00001000, 8'd4, 15);
+    apply_and_check(8'b00100000, 8'b00001000, 8'd5, 16);
+    apply_and_check(8'b01000000, 8'b00001000, 8'd6, 17);
+    apply_and_check(8'b10000000, 8'b00001000, 8'd7, 18);
+    apply_and_check(8'b11111111, 8'b00001000, 8'd7, 19);
+    apply_and_check(8'b00001111, 8'b00001000, 8'd3, 20);
 
-    ui_in  = 8'b0000_0001;
-    expect(8'd0, "flog2(0x01)");
+    // --- Bitwise OR  uio_in[2]=1 ---
+    // A = {2'b00, ui_in[7:2]},  B = {2'b00, ui_in[1:0], uio_in[7:4]}
+    $display("--- Bitwise OR ---");
+    for (i = 0; i < 16; i = i + 1) begin
+      ui_in  = $urandom & 8'hFF;
+      uio_in = ($urandom & 8'hF0) | 8'h04;
+      a = {2'b00, ui_in[7:2]};
+      b = {2'b00, ui_in[1:0], uio_in[7:4]};
+      apply_and_check(ui_in, uio_in, a | b, 100 + i);
+    end
+    apply_and_check(8'h00, 8'h04, 8'h00, 120);
+    apply_and_check(8'hFF, 8'hF4, 8'h3F, 121);
 
-    ui_in  = 8'b1000_0000;
-    expect(8'd7, "flog2(0x80)");
+    // --- Addition  uio_in[1]=1 ---
+    $display("--- Addition ---");
+    for (i = 0; i < 16; i = i + 1) begin
+      ui_in  = $urandom & 8'hFF;
+      uio_in = ($urandom & 8'hF0) | 8'h02;
+      a = {2'b00, ui_in[7:2]};
+      b = {2'b00, ui_in[1:0], uio_in[7:4]};
+      apply_and_check(ui_in, uio_in, a + b, 200 + i);
+    end
+    apply_and_check(8'h00, 8'h02, 8'h00, 220);
 
-    // -------------------------
-    // OR (uio_in[2])
-    // -------------------------
-    uio_in = 8'b0000_0100;
-    ui_in  = 8'b1101_0100;
-    expect(8'b00001101, "OR");
+    // --- Subtraction  uio_in[0]=1 ---
+    $display("--- Subtraction ---");
+    for (i = 0; i < 16; i = i + 1) begin
+      ui_in  = $urandom & 8'hFF;
+      uio_in = ($urandom & 8'hF0) | 8'h01;
+      a = {2'b00, ui_in[7:2]};
+      b = {2'b00, ui_in[1:0], uio_in[7:4]};
+      apply_and_check(ui_in, uio_in, a - b, 300 + i);
+    end
+    apply_and_check(8'h00, 8'h01, 8'h00, 320);
 
-    // -------------------------
-    // ADD (uio_in[1])
-    // -------------------------
-    uio_in = 8'b0000_0010;
-    ui_in  = 8'b0011_0010;
-    expect(8'b0, "ADD");
-
-    // -------------------------
-    // SUB (uio_in[0])
-    // -------------------------
-    uio_in = 8'b0000_0100;
-    ui_in  = 8'b0101_0001;
-    expect(8'd4, "SUB");
-
-    // -------------------------
-    // Default case
-    // -------------------------
-    uio_in = 8'b0000_0000;
-    ui_in  = 8'hFF;
-    expect(8'd0, "DEFAULT");
-
-    $display("🎉 ALL ASSERTIONS PASSED");
+    // --- Summary ---
+    #10;
+    $display("========================================");
+    $display("Results: %0d passed, %0d failed", pass_count, fail_count);
+    if (fail_count == 0)
+      $display("ALL TESTS PASSED");
+    else
+      $display("SOME TESTS FAILED");
+    $display("========================================");
     $finish;
   end
 
